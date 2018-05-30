@@ -64,4 +64,7 @@ The tradingstategy() class has a number of methods
 - load_model()        - loads the model saved as a pickle file. Predicts trading signal. Calls execute_order()
 - execute_order()     - based on prediction uses create_order() method from tpqoa helper class to enter market order
 - close_out()         - if a prespecified number of streaming datapoints have been passed closes open order and stops program
+
+**FIVE PYTHON SCRIPT**
+This is a python script of the trading strategy shown in the fourth notebook...
                 
