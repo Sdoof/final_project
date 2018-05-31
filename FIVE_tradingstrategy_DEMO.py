@@ -1,3 +1,17 @@
+#
+#
+# script for running backtested model
+# using logistic regression fit to historic
+# data as predictor
+#
+# by Piers Watson
+# as part of Certificate in Python for Algorithmic Trading
+#
+# THIS IS A DEMO MODEL ONLY: NOT BASED ON BACKTEST RESULTS
+#
+import sys
+sys.path.insert(0,'/root/')
+#
 from tpqoa import tpqoa
 import numpy as np
 import pandas as pd
@@ -5,24 +19,23 @@ import tables as tb
 import tstables as tstb
 import pickle
 import datetime
+from datetime import timedelta
 import time
-import sys
-sys.path.insert(0, '/root/')
 from sklearn import linear_model
-import matplotlib.pyplot as plt
-plt.style.use('seaborn')
-%matplotlib inline
 
+# create a logging file for debugging and information purposes
 import logging    
-logging.basicConfig(filename="jupyter_tradingstrategy.log",level=logging.DEBUG,
+logging.basicConfig(filename="python_tradingstrategy.log",level=logging.DEBUG,
                     format="%(asctime)s %(name)s.%(funcName)s +%(lineno)s: %(levelname)-8s %(message)s", 
                     datefmt ='%d/%m/%y %I:%M:%S %P')
 
 class tradingstrategy(tpqoa):
     '''class for trading strategy using lagged returns, rsi and macd
-    indicators. Optimised using logistic regression.
+    indicators. Optimised using logistic regression. Data streamed from
+    Oanda api.
     '''
-    def __init__(self, conf_file, instrument):
+    # special method __init__ which is used to instantiate our python object
+    def __init__(self, conf_file, instrument, stop):
         tpqoa.__init__(self, conf_file)
         self.instrument = instrument
         self.live_data = pd.DataFrame()
@@ -33,11 +46,22 @@ class tradingstrategy(tpqoa):
         self.mom1 = 2
         self.mom2 = 5
         self.lags = 20
+        self.stop = stop
+        self.stoptime = datetime.datetime(2018, 5, 30, 7, 30, 0, 0)
         self.model = linear_model.LogisticRegression()
+        self.stream_data()
         
     def stream_data(self, stop = None):
-        # self.stoptime = datetime.datetime(2018, 5, 25, 4, 0, 0, 0)
-        ''' starts a real time Oanda data stream'''
+        ''' starts a real time Oanda data stream
+        '''
+        print(20 * '-')
+        print('trading starting at %12s' % self.starttime) 
+        print('trading will stop after %12s ticks' % self.stop)
+        print(20* '-')
+        logging.info(20 * '-')
+        logging.info('trading starting at %12s' % self.starttime) 
+        logging.info('trading will stop after %12s ticks' % self.stop) 
+        logging.info(20 * '-')
         self.ticks = 0
         response = self.ctx_stream.pricing.stream(self.account_id, snapshot = True,
                                                  instruments = self.instrument)
@@ -46,35 +70,45 @@ class tradingstrategy(tpqoa):
                 self.on_success(msg.time,
                               float(msg.bids[0].price),
                               float(msg.asks[0].price))
-                if stop is not None:
-                    if self.ticks >= stop:
-                        self.close_out(stop)
+                if self.stop is not None:
+                    if self.ticks >= self.stop:
+                        self.close_out(self.stop)
                         break
-                            
+                                            
     def on_success(self, time, bid, ask):
         '''Method called when new data is received. This updates the on_success
         method originally in the tpqoa class inherited by tradingstrategy class
         which merely printed and timestamped bid and ask prices'''
         self.ticks += 1
         if self.ticks % 1 == 0:
-            print('%3d | '% self.ticks, time, bid, ask)
-            
+            print('%3d | %12s | bid %12s | ask %12s'% (self.ticks, time, bid, ask))
+        # live streaming data append to live_data dataframe    
         self.live_data = self.live_data.append(pd.DataFrame({'bid':bid, 
                                                              'ask': ask},
                                                             index = [pd.Timestamp(time)]))
+        # live streaming data resampled into bars
+        # resample every 5 seconds for testing...
         self.dataresam = self.live_data.resample('5s', label = 'right').last().ffill().iloc[:-1]
+        # resample every 10 minutes as in model...
+        #self.dataresam = self.live_data.resample('10T', label = 'right').last().ffill().iloc[:-1]
+        # having resmpled data calculate mid and therefore period return %
         self.dataresam['mid'] = self.dataresam.mean(axis=1)
         self.dataresam['returns'] = np.log(self.dataresam['mid'] / self.dataresam['mid'].shift(1))
-        if len(self.dataresam) > 22: # self.mom2: ******************************
-                                                # *****************************
+        # if the length of the dataresam is large enough start calculating features
+        if len(self.dataresam) > 22: 
+            # call relative strength_method to calculate RSI Index
             self.dataresam['RSI'] = self.relative_strength(self.dataresam['mid'], self.rsi_n)
+            # call macd method to calculate macd index
             self.dataresam['MACD'] = self.macd(self.dataresam['mid'])
+            # call prepare_features method to calculate lagged, returns, RSI, macd and also mom
             self.dataresam = self.prepare_features(self.dataresam, self.lags)
+            # call load_model method to use saved model
             self.load_model()
     
     def relative_strength(self, data, rsi_n):
         '''Creates RSI feature -
-        initial RSI value created here'''
+        initial RSI value created here
+        '''
         abchange = (data - data.shift(1)) # calculate absolute daily change
         rsperiod = abchange[:rsi_n + 1]
         upday = rsperiod[rsperiod >= 0].sum() / rsi_n # in the RSI period what is the up day change
@@ -151,22 +185,30 @@ class tradingstrategy(tpqoa):
         return df
     
     def load_model(self):
+        '''model determined by backtesting has been saved in pickle
+        we call the model here applying features created by live data
+        '''
         LinMod = pickle.load(open('final_model.sav','rb'))
         pred = LinMod.predict(self.dataresam[self.cols])
         self.dataresam['prediction'] = pred
+        # call method execute_order to submit trades to market
         self.execute_order()
         
     def execute_order(self):
         # Entering long
         if self.dataresam['prediction'].iloc[-2] > 0 and self.position == 0:
-            print('going long')
+            #print('going long')
+            print('going long | %s | units %4d | ask %0.5f' % 
+                         (self.instrument, self.units, self.dataresam.iloc[-1]['ask']))
             self.position = 1
             self.create_order(self.instrument, self.units)
             logging.info('going long | %s | units %4d | ask %0.5f' % 
                          (self.instrument, self.units, self.dataresam.iloc[-1]['ask']))
             
         elif self.dataresam['prediction'].iloc[-2] > 0 and self.position == -1:
-            print('covering short and going long')
+            #print('covering short and going long')
+            print('covering short and going long | %s | units %4d | ask %0.5f' %
+                         (self.instrument, self.units, self.dataresam.iloc[-1]['ask']))
             self.position = 1
             self.create_order(self.instrument, 2 * self.units)
             logging.info('covering short and going long | %s | units %4d | ask %0.5f' %
@@ -174,21 +216,26 @@ class tradingstrategy(tpqoa):
             
         # Entering short
         elif self.dataresam['prediction'].iloc[-2] < 0 and self.position == 0:
-            print('going short')
+            #print('going short')
+            print('going short | %s | units %4d | bid %0.5f' % 
+                         (self.instrument, self.units, self.dataresam.iloc[-1]['bid']))
             self.position = -1
             self.create_order(self.instrument, units = -self.units)
             logging.info('going short | %s | units %4d | bid %0.5f' % 
                          (self.instrument, self.units, self.dataresam.iloc[-1]['bid']))
             
         elif self.dataresam['prediction'].iloc[-2] < 0 and self.position == 1:
-            print('covering long and going short')
+            #print('covering long and going short')
+            print('covering long and going short | %s | units %4d | bid %0.5f' %
+                         (self.instrument, self.units, self.dataresam.iloc[-1]['bid']))
             self.position = -1
             self.create_order(self.instrument, units = -2 * self.units)
             logging.info('covering long and going short | %s | units %4d | bid %0.5f' %
                          (self.instrument, self.units, self.dataresam.iloc[-1]['bid']))      
                 
     def close_out(self, stop):
-        if self.ticks >= stop:
+        if self.ticks >= self.stop:
+
             logging.info('stop reached')
         
             # stop reached close out long position
@@ -197,7 +244,9 @@ class tradingstrategy(tpqoa):
                                   units = -self.units)
                 logging.info('stop reached - closing long, no open positions| %s | units %4d | bid %0.5f' 
                              % (self.instrument, self.units, self.dataresam.iloc[-1]['bid']))
+                print(15 * '-')
                 print('stop reached - closing long, no open positions') 
+                print(15 * '-')
                 self.position = 0
                 
             # stop reached close out short position
@@ -205,8 +254,23 @@ class tradingstrategy(tpqoa):
                 self.create_order(self.instrument, units = self.units)
                 logging.info('stop reached - closing short, no open position| %s | units %4d | ask %0.5f' 
                              % (self.instrument, self.units, self.dataresam.iloc[-1]['ask']))
+                print(15 * '-')
                 print('stop reached - closing short, no open positions')
+                print(15 * '-')
                 self.position = 0
-        
-            print(15 * '-')
-            # sys.exit('Trading has stopped')
+            # id - needs to be set to the lastest order id in your Oanda transactions
+            # report
+            self.response = self.ctx.transaction.since(self.account_id, id = 3064)
+            self.transactions = self.response.get('transactions')
+            for trans in self.transactions:
+                trans = trans.dict()
+                if trans['type']  == 'ORDER_FILL':
+                    templ = '%s | id %8s | %6s | %9s | price %9s | p&l %8s'
+                    print(templ % (trans['time'], trans['orderID'], trans['instrument'],trans['units'], 
+                                   trans['price'], trans['pl']))
+                    #               trans['fullPrice']['bids'][0]['price'],
+                    logging.info(templ % (trans['time'], trans['orderID'], trans['instrument'],trans['units'],
+                                          trans['price'], trans['pl'])) 
+                    
+if __name__ == '__main__':
+    di = tradingstrategy('/root/pyalgo.cfg','AUD_USD', stop = 50)
