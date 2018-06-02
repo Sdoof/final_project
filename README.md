@@ -18,22 +18,22 @@ We find that machine learning determines a model that produces profitable result
 
 There are four Jupyter Notebooks and a Python script included with the project
 
-- ONE_getdata_features.ipynb - retrieves data from Oanda API and creates the features to be used for testing
-- TWO_backtest_initial.ipynb - backtests the strategy on training and validation data
-- THREE_backtest_final.ipynb - once the strategy is finalised strategy is run on testing data which has not been previously seen
-- FOUR_tradingstrategy.ipynb - includes trading strategy class which runs strategy using live data from Oanda api. This is in testing mode and is set to stream data for 50 bars. The parameters are set so that trades will occur during this time for demonstration purposes (see **FOURTH NOTEBOOK** below)
-- FIVE_tradingstrategy_DEMO.py - a demo version of the python script of the trading strategy class this script is set to run for 10 minutes and trades will occur as the parameters have been set to shorter timeframe than those in the live model. 
-- FIVE_tradingstrategy_LIVE.py - a live python script of the trading strategy class this script is set to run as per the models parameters for 850 minutes. 
+- **ONE_getdata_features.ipynb** - retrieves data from Oanda API and creates the features to be used for testing
+- **TWO_backtest_initial.ipynb** - backtests the strategy on training and validation data
+- **THREE_backtest_final.ipynb** - once the strategy is finalised strategy is run on testing data which has not been previously seen
+- **FOUR_tradingstrategy.ipynb** - includes trading strategy class which runs strategy using live data from Oanda api. This is in testing mode and is set to stream data for 50 bars. The parameters are set so that trades will occur during this time for demonstration purposes (see **FOURTH NOTEBOOK** below)
+- **FIVE_tradingstrategy_DEMO.py** - a demo version of the python script of the trading strategy class this script is set to run for 10 minutes and trades will occur as the parameters have been set to shorter timeframe than those in the live model. 
+- **FIVE_tradingstrategy_LIVE.py** - a live python script of the trading strategy class this script is set to run as per the models parameters for 850 minutes. 
 
 There are also a number of files that can be used with the project:
 
-- data.h5 - this is the raw historic data taken from Oanda
-- data_features - includes the raw historical data from data.h5 plus technical signals that have been generated - RSI, MACD and momentum used plus the lagged data which make up all of the features
-- final_model.sav - this is a pickle file of the model we have decided should be used for algorithmic trading following the backtest
-- jupyter_tradingstrategy.log - log file for Jupyter notebook **FOURTH NOTEBOOK** messages include information messages we have included in the class 
-- python_tradingstrategy.log - log file for Python script **FIVE PYTHON SCRIPT** messages include information messages we have included in the class 
-- liveresult_tradingstrategy.log - example log file from the model running for a 30 hour period on 31st May
-- tpqoa.py - self explanatory
+- **data.h5** - this is the raw historic data taken from Oanda
+- **data_features** - includes the raw historical data from data.h5 plus technical signals that have been generated - RSI, MACD and momentum used plus the lagged data which make up all of the features
+- **final_model.sav** - this is a pickle file of the model we have decided should be used for algorithmic trading following the backtest
+- **jupyter_tradingstrategy.log** - log file for Jupyter notebook **FOURTH NOTEBOOK** messages include information messages we have included in the class 
+- **python_tradingstrategy.log** - log file for Python script **FIVE PYTHON SCRIPT** messages include information messages we have included in the class 
+- **liveresult_tradingstrategy.log** - example log file from the model running for a 30 hour period on 31st May
+- **tpqoa.py - self explanatory**
 
 ### **The backtest results**
 It was decided to test a strategy on 10 minute historical data. After training the model on the backtest data and checking the results on the validation data as well as cross validating the parameters decided on were 20 bar lagged price returns, one lagged RSI and MACD bar as well as 10 bar and 50 bar momentum. When these parameters were run on the test data the results were promising.
