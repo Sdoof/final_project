@@ -14,6 +14,9 @@ Technical analysis has been used by market participants to determine patterns in
 
 We find that machine learning determines a model that produces profitable results before transaction costs and outperforms a simple buy and hold stategy. We also run the model in a a 'live' market environment.
 
+### **config file**
+We have used a config file to access the Oanda api. This is used in **ONE_getdata_features.ipynb** in cell 5 ‘oanda = tpqoa(‘/root/pyalgo.cfg’), and in the **FOUR_tradingstrategy.ipynb** in cell 9 ‘rt = tradingstrategy(‘/root/pyalgo.cfg’) and finally it is located in the __name__ special sttribute in **FIVE_tradingstrategy_DEMO.py** and **FIVE_tradingstrategy_LIVE.py**. It is assumed the user will replace these with their own config file path to access the Oanda api.
+
 ### **Jupyter Notebooks**
 
 There are four Jupyter Notebooks and a Python script included with the project
