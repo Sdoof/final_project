@@ -140,6 +140,7 @@ class tradingstrategy(tpqoa):
         return rsi # Return the RSI Index value calculated
     
     def macd(self, data, slow = 26, fast = 12, signal = 9):
+        '''creates macd feature'''
         # calculate respective fast and slow exponential moving averages
         ema_fast = data.ewm(span = fast).mean()
         ema_slow = data.ewm(span = slow).mean()
@@ -195,6 +196,9 @@ class tradingstrategy(tpqoa):
         self.execute_order()
         
     def execute_order(self):
+        '''method to execute orders once predicted 
+        by model
+        '''
         # Entering long
         if self.dataresam['prediction'].iloc[-2] > 0 and self.position == 0:
             #print('going long')
@@ -234,6 +238,10 @@ class tradingstrategy(tpqoa):
                          (self.instrument, self.units, self.dataresam.iloc[-1]['bid']))      
                 
     def close_out(self, stop):
+        '''at end of test closes out open positions
+        and prepares reporting of transactions. Note there is an id number 
+        that needs to be updated so that previous data from Oanda not included
+        in reporting see - UPDATE ID NUMBER HERE'''
         if self.ticks >= self.stop:
 
             logging.info('stop reached')
@@ -260,6 +268,7 @@ class tradingstrategy(tpqoa):
                 self.position = 0
             # id - needs to be set to the lastest order id in your Oanda transactions
             # report
+            '''UPDATE ID NUMBER HERE'''
             self.response = self.ctx.transaction.since(self.account_id, id = 3064)
             self.transactions = self.response.get('transactions')
             for trans in self.transactions:
